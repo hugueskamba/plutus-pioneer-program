@@ -1,3 +1,4 @@
+-- Language extensions
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
@@ -7,8 +8,10 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
+-- Comment this out to run in the playground
 module Week02.Gift where
 
+-- Modules for running Plutus contract on Haskell
 import           Control.Monad       hiding (fmap)
 import           Data.Map            as Map
 import           Data.Text           (Text)
@@ -27,6 +30,9 @@ import           Playground.Types    (KnownCurrency (..))
 import           Prelude             (Semigroup (..))
 import           Text.Printf         (printf)
 
+
+-- An easy validator where datum, redeemer, context are ignored and validation
+-- always succeeds. Any arbitratry transaction can consume the EUTxOs that sits at the script adress.
 {-# INLINABLE mkValidator #-}
 mkValidator :: Data -> Data -> Data -> ()
 mkValidator _ _ _ = ()
@@ -40,11 +46,13 @@ valHash = Scripts.validatorHash validator
 scrAddress :: Ledger.Address
 scrAddress = ScriptAddress valHash
 
+-- Wallet code
 type GiftSchema =
     BlockchainActions
         .\/ Endpoint "give" Integer
         .\/ Endpoint "grab" ()
 
+-- To deposit money
 give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
 give amount = do
     let tx = mustPayToOtherScript valHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
@@ -52,6 +60,7 @@ give amount = do
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace" amount
 
+-- Looks for EUTxO at the script address and consumes them
 grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Contract w s e ()
 grab = do
     utxos <- utxoAt scrAddress

@@ -35,6 +35,7 @@ mkValidator () r _
     | r == 42   = True
     | otherwise = False
 
+-- Tell the compiler which type picked for datum and redeemer
 data Typed
 instance Scripts.ScriptType Typed where
     type instance DatumType Typed = ()
