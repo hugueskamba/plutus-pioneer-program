@@ -20,7 +20,7 @@ import Wallet.Emulator.Wallet
 
 data PayParams = PayParams
     { ppRecipient :: PubKeyHash
-    , ppLovelace  :: Integer
+    , ppAmount  :: Integer
     } deriving (Show, Generic, FromJSON, ToJSON)
 
 type PaySchema = BlockchainActions .\/ Endpoint "pay" PayParams
@@ -28,15 +28,29 @@ type PaySchema = BlockchainActions .\/ Endpoint "pay" PayParams
 payContract :: Contract () PaySchema Text ()
 payContract = do
     pp <- endpoint @"pay"
-    let tx = mustPayToPubKey (ppRecipient pp) $ lovelaceValueOf $ ppLovelace pp
+    let tx = mustPayToPubKey (ppRecipient pp) $ lovelaceValueOf $ ppAmount pp
     void $ submitTx tx
     payContract
 
--- A trace that invokes the pay endpoint of payContract on Wallet 1 twice, each time with Wallet 2 as
--- recipient, but with amounts given by the two arguments. There should be a delay of one slot
--- after each endpoint call.
+-- A trace that invokes the pay endpoint of payContract on Wallet 1 twice,
+-- each time with Wallet 2 as recipient, but with amounts given by the two
+-- arguments. There should be a delay of one slot after each endpoint call.
 payTrace :: Integer -> Integer -> EmulatorTrace ()
-payTrace x y = undefined -- IMPLEMENT ME!
+payTrace x y = do
+    h1 <- activateContractWallet (Wallet 1) endpoints
+    h2 <- activateContractWallet (Wallet 2) endpoints
+    callEndpoint @"pay" h1 $ PayParams {
+            ppRecipient = pubKeyHash $ walletPubKey $ Wallet 2,
+            ppAmount = x
+        }
+    void $ waitNSlots 1
+    callEndpoint @"pay" h1 $ PayParams {
+            ppRecipient = pubKeyHash $ walletPubKey $ Wallet 2,
+            ppAmount = y
+        }
+    void $ waitNSlots 1
+
+
 
 payTest1 :: IO ()
 payTest1 = runEmulatorTraceIO $ payTrace 1000000 2000000

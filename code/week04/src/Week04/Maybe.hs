@@ -22,5 +22,13 @@ foo' x y z = readMaybe x `bindMaybe` \k ->
              readMaybe z `bindMaybe` \m ->
              Just (k + l + m)
 
+-- foo' x y z = bindMaybe (readMaybe x) (
+--     \k -> bindMaybe (readMaybe y) (
+--         \l -> bindMaybe (readMaybe z) (
+--             \m -> Just (k + l + m)
+--         )
+--     )
+-- )
+
 foo'' :: String -> String -> String -> Maybe Int
 foo'' x y z = threeInts (readMaybe x) (readMaybe y) (readMaybe z)

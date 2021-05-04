@@ -22,3 +22,4 @@ bar :: IO ()
 bar = getLine >>= \s ->
       getLine >>= \t ->
       putStrLn (s ++ t)
+-- bar = getLine >>= (\s -> getLine >>= (\t -> putStrLn (s ++ t)))
