@@ -63,5 +63,21 @@ There is contract monad which defines off-chain code that will be running in the
 -- w: it allows you to write log message of type w
 -- s: the capabiility of the blockchain, what blockchain specific actions this contract can perform (i.e waiting for a slot, submit tx, finding out public key)
 -- e: defines the type of error messages
--- a: result of the computation 
+-- a: result of the computation
+```
+One of the main purpose of the Contract monad is to construct and submit transactions.
+
+## Do notation
+It is syntactic sugar for Monads when the bind operation is used `(>>=)` that allow you to use `<-`.
+
+## `endpoint` function
+The `endpoint` function is a contract that blocks until an input is provided from the outside.
+```haskell
+give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+...
+endpoints :: Contract () GiftSchema Text ()
+endpoints = (give' `select` grab') >> endpoints -- Recursively call itself
+  where
+    give' = endpoint @"give" >>= give -- Blocks until params (Integer in this case) are provided and then passed to the give function
+    grab' = endpoint @"grab" >>= grab
 ```

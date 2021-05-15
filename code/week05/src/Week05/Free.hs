@@ -31,6 +31,7 @@ import           Playground.Types       (KnownCurrency (..))
 import           Text.Printf            (printf)
 import           Wallet.Emulator.Wallet
 
+-- On-chain part
 {-# INLINABLE mkPolicy #-}
 mkPolicy :: ScriptContext -> Bool
 mkPolicy _ = True
@@ -41,6 +42,7 @@ policy = mkMonetaryPolicyScript $$(PlutusTx.compile [|| Scripts.wrapMonetaryPoli
 curSymbol :: CurrencySymbol
 curSymbol = scriptCurrencySymbol policy
 
+-- Off-chain part
 data MintParams = MintParams
     { mpTokenName :: !TokenName
     , mpAmount    :: !Integer
