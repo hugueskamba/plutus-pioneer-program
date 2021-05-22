@@ -45,10 +45,10 @@ import           Prelude                   (Semigroup (..))
 import qualified Prelude                   as Prelude
 
 data Oracle = Oracle
-    { oSymbol   :: !CurrencySymbol
-    , oOperator :: !PubKeyHash
-    , oFee      :: !Integer
-    , oAsset    :: !AssetClass
+    { oSymbol   :: !CurrencySymbol -- currency symbol of the NFT
+    , oOperator :: !PubKeyHash -- the owner of the oracle
+    , oFee      :: !Integer -- the fees in Lovelace
+    , oAsset    :: !AssetClass -- the target of the oracle (USD stablecoin)
     } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
 
 PlutusTx.makeLift ''Oracle
@@ -58,14 +58,19 @@ data OracleRedeemer = Update | Use
 
 PlutusTx.unstableMakeIsData ''OracleRedeemer
 
+-- Empty string token name for the NFT
 {-# INLINABLE oracleTokenName #-}
 oracleTokenName :: TokenName
 oracleTokenName = TokenName emptyByteString
 
+-- Uniquely identify the UTxO with the oracle value
 {-# INLINABLE oracleAsset #-}
 oracleAsset :: Oracle -> AssetClass
 oracleAsset oracle = AssetClass (oSymbol oracle, oracleTokenName)
 
+-- Look up the datum of that UTxO and return it as an integer (because the ratio
+-- type in Plutus does not implement fromJSON)
+-- TxOut: The output of the UTxO that holds the oracle
 {-# INLINABLE oracleValue #-}
 oracleValue :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe Integer
 oracleValue o f = do
@@ -87,25 +92,31 @@ mkOracleValidator oracle x r ctx =
     info :: TxInfo
     info = scriptContextTxInfo ctx
 
+    -- Gets the input of the Tx which in this case is the Oracle parameter as
+    -- it is a parameterized script
     ownInput :: TxOut
     ownInput = case findOwnInput ctx of
         Nothing -> traceError "oracle input missing"
         Just i  -> txInInfoResolved i
 
+    -- Checks if the tx input contains the NFT
     inputHasToken :: Bool
     inputHasToken = assetClassValueOf (txOutValue ownInput) (oracleAsset oracle) == 1
 
+    -- Gets the output at the oracle contract address
     ownOutput :: TxOut
     ownOutput = case getContinuingOutputs ctx of
         [o] -> o
         _   -> traceError "expected exactly one oracle output"
 
+    -- Checks if the tx output contains the NFT
     outputHasToken :: Bool
     outputHasToken = assetClassValueOf (txOutValue ownOutput) (oracleAsset oracle) == 1
 
     outputDatum :: Maybe Integer
     outputDatum = oracleValue ownOutput (`findDatum` info)
 
+    -- Checks that the update oracle value is valid
     validOutputDatum :: Bool
     validOutputDatum = isJust outputDatum
 
@@ -135,9 +146,10 @@ oracleValidator = Scripts.validatorScript . oracleInst
 oracleAddress :: Oracle -> Ledger.Address
 oracleAddress = scriptAddress . oracleValidator
 
+-- Off chain part
 data OracleParams = OracleParams
     { opFees   :: !Integer
-    , opSymbol :: !CurrencySymbol
+    , opSymbol :: !CurrencySymbol -- the symbol of the token to track, so the USD stablecoin
     , opToken  :: !TokenName
     } deriving (Show, Generic, FromJSON, ToJSON)
 
@@ -173,6 +185,7 @@ updateOracle oracle x = do
             awaitTxConfirmed $ txId ledgerTx
             logInfo @String $ "updated oracle value to " ++ show x
 
+-- Find UTxO that has the NFT
 findOracle :: forall w s. HasBlockchainActions s => Oracle -> Contract w s Text (Maybe (TxOutRef, TxOutTx, Integer))
 findOracle oracle = do
     utxos <- Map.filter f <$> utxoAt (oracleAddress oracle)
